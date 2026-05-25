@@ -1,10 +1,67 @@
-import { Message, Settings } from '../types';
+import type { Message, Settings } from '../types';
+import { normalizeApiEndpoint } from './endpoint';
+
+const LOCAL_PROXY_PATH = '/api/livermore/chat';
+
+const isLocalPreview = () => {
+  if (typeof window === 'undefined') {
+    return false;
+  }
+
+  return ['localhost', '127.0.0.1'].includes(window.location.hostname);
+};
+
+const validateModelId = (modelId: string) => {
+  const trimmed = modelId.trim();
+
+  if (!trimmed) {
+    throw new Error('请先填写模型接入点 ID。');
+  }
+
+  if (trimmed.startsWith('cm-')) {
+    throw new Error(
+      '你填的是模型仓库 ID（cm-...），不能直接调用。请使用模型接入点 ID（通常是 ep-...）。'
+    );
+  }
+};
+
+const parseApiResponse = async (response: Response, targetEndpoint: string) => {
+  const data = await response.json();
+
+  if (!data.choices || data.choices.length === 0) {
+    throw new Error("Empty response received from the Oracle.");
+  }
+
+  return data.choices[0]?.message?.content || '...The ticker tape is silent...';
+};
+
+const buildError = async (response: Response, targetEndpoint: string) => {
+  const errorData = await response.json().catch(() => ({}));
+  const apiMessage = errorData.error?.message || errorData.message;
+
+  if (response.status === 401) {
+    return new Error(`401 Unauthorized: API Key Invalid.`);
+  }
+
+  if (response.status === 404) {
+    return new Error(
+      apiMessage ||
+      `404 Not Found: Endpoint or ID not found. Request URL: ${targetEndpoint}`
+    );
+  }
+
+  return new Error(
+    apiMessage ||
+    `API Error (${response.status}): ${response.statusText}`
+  );
+};
 
 export const sendMessageToOracle = async (
   messages: Message[],
   settings: Settings
 ): Promise<string> => {
   const { apiEndpoint, apiKey, modelId, systemPrompt } = settings;
+  validateModelId(modelId);
 
   // Prepare messages with system prompt at the start
   const apiMessages = [
@@ -12,26 +69,33 @@ export const sendMessageToOracle = async (
     ...messages.map((m) => ({ role: m.role, content: m.content })),
   ];
 
-  // Logic to normalize the endpoint URL
-  let targetEndpoint = apiEndpoint.trim();
-  
-  // Remove trailing slash
-  targetEndpoint = targetEndpoint.replace(/\/$/, '');
-
-  if (!targetEndpoint) {
-    targetEndpoint = 'https://api.openai.com/v1/chat/completions';
-  } else if (!targetEndpoint.includes('/chat/completions')) {
-    // Smart Append Logic
-    if (targetEndpoint.endsWith('/v3')) {
-      targetEndpoint += '/chat/completions';
-    } else if (targetEndpoint.endsWith('/v1')) {
-      targetEndpoint += '/chat/completions';
-    } else {
-      targetEndpoint += '/v1/chat/completions';
-    }
-  }
+  const targetEndpoint = normalizeApiEndpoint(apiEndpoint);
 
   try {
+    if (isLocalPreview()) {
+      const proxyResponse = await fetch(LOCAL_PROXY_PATH, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+        },
+        body: JSON.stringify({
+          apiEndpoint,
+          modelId,
+          systemPrompt,
+          messages,
+        }),
+      });
+
+      if (proxyResponse.ok) {
+        return parseApiResponse(proxyResponse, targetEndpoint);
+      }
+
+      if (proxyResponse.status !== 501 || !apiKey.trim()) {
+        throw await buildError(proxyResponse, targetEndpoint);
+      }
+    }
+
     const response = await fetch(targetEndpoint, {
       method: 'POST',
       headers: {
@@ -47,29 +111,10 @@ export const sendMessageToOracle = async (
     });
 
     if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      
-      if (response.status === 401) {
-        throw new Error(`401 Unauthorized: API Key Invalid.`);
-      }
-      if (response.status === 404) {
-        throw new Error(`404 Not Found: Endpoint path incorrect.`);
-      }
-      
-      throw new Error(
-        errorData.error?.message || 
-        errorData.message || 
-        `API Error (${response.status}): ${response.statusText}`
-      );
+      throw await buildError(response, targetEndpoint);
     }
 
-    const data = await response.json();
-    
-    if (!data.choices || data.choices.length === 0) {
-      throw new Error("Empty response received from the Oracle.");
-    }
-
-    return data.choices[0]?.message?.content || '...The ticker tape is silent...';
+    return parseApiResponse(response, targetEndpoint);
   } catch (error: any) {
     console.error("Transmission Failed:", error);
     

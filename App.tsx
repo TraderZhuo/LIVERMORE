@@ -11,6 +11,7 @@ const App: React.FC = () => {
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [copyFeedback, setCopyFeedback] = useState<string | null>(null);
+  const [hasLoadedHistory, setHasLoadedHistory] = useState(false);
   
   // Edit State
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -26,7 +27,14 @@ const App: React.FC = () => {
     const savedSettings = localStorage.getItem(LOCAL_STORAGE_KEY);
     if (savedSettings) {
       try {
-        setSettings({ ...DEFAULT_SETTINGS, ...JSON.parse(savedSettings) });
+        const parsedSettings = { ...DEFAULT_SETTINGS, ...JSON.parse(savedSettings) };
+
+        if (!parsedSettings.modelId || parsedSettings.modelId.startsWith('cm-')) {
+          parsedSettings.modelId = DEFAULT_SETTINGS.modelId;
+        }
+
+        setSettings(parsedSettings);
+        localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(parsedSettings));
       } catch (e) {
         console.error("Failed to parse settings", e);
       }
@@ -46,6 +54,7 @@ const App: React.FC = () => {
         console.error("Failed to parse history", e);
       }
     }
+    setHasLoadedHistory(true);
   }, []);
 
   // Save settings when changed
@@ -56,11 +65,13 @@ const App: React.FC = () => {
 
   // Save history when messages change
   useEffect(() => {
+    if (!hasLoadedHistory) return;
+
     localStorage.setItem(LOCAL_STORAGE_HISTORY_KEY, JSON.stringify(messages));
     if (!isLoading) {
       scrollToBottom();
     }
-  }, [messages, isLoading]);
+  }, [messages, isLoading, hasLoadedHistory]);
 
   const handleClearHistory = () => {
     setMessages([]);
@@ -156,17 +167,19 @@ const App: React.FC = () => {
   
   const headerBg = isDark ? 'bg-black/80 border-[#b8860b]/30' : 'bg-[#f5f5dc]/90 border-[#b8860b]/30';
   const titleColor = isDark ? 'text-[#f0e68c]' : 'text-[#8b4513]';
-  const userBubbleClass = isDark ? 'bg-zinc-900/40 border-zinc-700/50 text-gray-300' : 'bg-white/60 border-gray-300 text-gray-800';
+  const userBubbleClass = isDark ? 'bg-zinc-950/80 border-zinc-700/70 text-gray-200' : 'bg-white/75 border-gray-300 text-gray-800';
   const aiBubbleClass = isDark
-    ? 'bg-[#0f1208]/80 border-[#b8860b]/30 text-[#f0e68c] shadow-[0_0_15px_rgba(240,230,140,0.1)]'
+    ? 'bg-[#101006]/90 border-[#b8860b]/45 text-[#f0e68c] shadow-[0_0_22px_rgba(184,134,11,0.12)]'
     : 'bg-[#1a1a1a] border-[#b8860b]/30 text-[#f0e68c] shadow-lg'; 
-  const inputContainerClass = isDark ? 'bg-black/90 border-[#b8860b]/50' : 'bg-white/90 border-[#b8860b]/50 shadow-sm';
-  const inputTextClass = isDark ? 'text-[#d4af37] placeholder-[#b8860b]/30' : 'text-[#2c2c2c] placeholder-[#8b7d6b]/50';
+  const inputContainerClass = isDark
+    ? 'bg-[#060606]/95 border border-[#b8860b]/35 shadow-[0_12px_46px_rgba(0,0,0,0.62),0_0_18px_rgba(184,134,11,0.06)] focus-within:border-[#f0e68c]/80 focus-within:shadow-[0_0_0_1px_rgba(240,230,140,0.14),0_20px_70px_rgba(0,0,0,0.7),0_0_38px_rgba(184,134,11,0.24)]'
+    : 'bg-white/95 border border-[#b8860b]/65 shadow-[0_12px_36px_rgba(44,44,44,0.12)] focus-within:border-[#8b4513] focus-within:shadow-[0_14px_42px_rgba(139,69,19,0.16)]';
+  const inputTextClass = isDark ? 'text-[#f0e68c] placeholder-[#b8860b]/55' : 'text-[#2c2c2c] placeholder-[#8b7d6b]/65';
   
   // Dynamic Footer Gradient
   const footerGradient = isDark 
-    ? 'bg-gradient-to-t from-black via-black/90 to-transparent' 
-    : 'bg-gradient-to-t from-[#f5f5dc] via-[#f5f5dc]/90 to-transparent';
+    ? 'bg-gradient-to-t from-black via-black/95 to-black/0' 
+    : 'bg-gradient-to-t from-[#f5f5dc] via-[#f5f5dc]/95 to-[#f5f5dc]/0';
 
   return (
     // CHANGED: h-screen overflow-hidden to freeze layout
@@ -203,11 +216,11 @@ const App: React.FC = () => {
       {/* Chat Area - Scrollable */}
       <main className="relative z-0 flex-1 overflow-y-auto p-4 md:p-8 space-y-8 scroll-smooth custom-scrollbar">
         {messages.length === 0 && (
-          <div className="flex flex-col items-center justify-center h-full opacity-30 text-center select-none pb-20">
-            <div className="w-24 h-24 border border-[#b8860b] rounded-full flex items-center justify-center mb-6 animate-pulse">
-              <span className="font-serif text-5xl italic text-[#b8860b]">J.L.</span>
+          <div className="flex flex-col items-center justify-center h-full text-center select-none pb-24">
+            <div className="w-24 h-24 border border-[#b8860b]/35 rounded-full flex items-center justify-center mb-6 animate-pulse shadow-[0_0_34px_rgba(184,134,11,0.08)]">
+              <span className="font-serif text-5xl italic text-[#b8860b]/50">J.L.</span>
             </div>
-            <p className="font-serif text-xl italic text-[#8b7d6b]">
+            <p className="font-serif text-xl italic text-[#8b7d6b]/70">
               {t.emptyStateQuote}
             </p>
           </div>
@@ -279,30 +292,33 @@ const App: React.FC = () => {
       </main>
 
       {/* Footer - Fixed Bottom */}
-      <footer className={`relative z-20 flex-shrink-0 p-6 ${footerGradient}`}>
-        <div className="max-w-3xl mx-auto relative group">
-          <div className="absolute -inset-0.5 bg-gradient-to-r from-[#b8860b]/0 via-[#b8860b]/40 to-[#b8860b]/0 opacity-50 blur transition duration-1000 group-hover:duration-200"></div>
-          <div className={`relative flex items-center rounded-sm transition-colors duration-300 ${inputContainerClass}`}>
-            <span className="pl-4 text-[#b8860b] text-xl animate-pulse font-bold drop-shadow-[0_0_5px_rgba(184,134,11,0.8)]">❯</span>
+      <footer className={`relative z-20 flex-shrink-0 px-4 py-5 md:px-6 md:py-6 ${footerGradient}`}>
+        <div className="max-w-4xl mx-auto relative group">
+          <div className="absolute -inset-1 bg-gradient-to-r from-[#b8860b]/0 via-[#d4af37]/24 to-[#b8860b]/0 opacity-25 blur-md transition duration-500 group-focus-within:opacity-85"></div>
+          <div className={`relative flex items-center rounded-sm transition-all duration-300 ${inputContainerClass}`}>
+            <span className="pl-4 md:pl-5 text-[#b8860b]/75 text-xl animate-pulse font-bold drop-shadow-[0_0_5px_rgba(212,175,55,0.35)]">❯</span>
             <input
               type="text"
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={handleKeyDown}
               placeholder={t.askPlaceholder}
-              className={`w-full bg-transparent border-none px-4 py-4 focus:ring-0 focus:outline-none font-mono text-base caret-animate drop-shadow-[0_0_2px_rgba(184,134,11,1)] ${inputTextClass}`}
+              className={`min-w-0 w-full bg-transparent border-none px-3 py-4 md:px-4 md:py-5 focus:ring-0 focus:outline-none font-mono text-[15px] md:text-base caret-animate drop-shadow-[0_0_2px_rgba(184,134,11,0.9)] ${inputTextClass}`}
               autoFocus
             />
             <button 
               onClick={() => handleSubmit()}
               disabled={isLoading || !input.trim()}
-              className="mr-2 px-4 py-2 text-xs uppercase tracking-widest text-[#b8860b] hover:text-[#f0e68c] disabled:opacity-50 transition-colors font-bold"
+              className="mr-2 md:mr-3 flex-shrink-0 inline-flex items-center gap-2 border border-[#d4af37]/45 bg-[#d4af37]/10 px-3 py-2 md:px-4 text-[11px] md:text-xs uppercase tracking-widest text-[#f0e68c] hover:bg-[#d4af37] hover:text-black disabled:bg-transparent disabled:text-[#8b7d6b] disabled:border-[#8b7d6b]/20 disabled:opacity-55 transition-all font-bold"
             >
+              <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 12h14m-6-6 6 6-6 6" />
+              </svg>
               {t.execute}
             </button>
           </div>
         </div>
-        <div className="text-center mt-4 text-[10px] text-[#8b7d6b] font-mono opacity-60">
+        <div className="text-center mt-3 text-[10px] text-[#8b7d6b] font-mono opacity-55">
           {t.footer}
         </div>
       </footer>

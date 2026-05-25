@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "dev:vscode": "BROWSER=./scripts/open-vscode-preview.js vite --open",
     "build": "vite build",
     "preview": "vite preview"
   },

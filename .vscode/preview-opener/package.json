@@ -1,0 +1,17 @@
+{
+  "name": "livermore-preview-opener",
+  "displayName": "Livermore Preview Opener",
+  "description": "Opens the Livermore Vite dev server in VSCode's integrated browser.",
+  "version": "0.0.1",
+  "publisher": "local",
+  "engines": {
+    "vscode": "^1.70.0"
+  },
+  "activationEvents": [
+    "onUri"
+  ],
+  "extensionKind": [
+    "ui"
+  ],
+  "main": "./extension.js"
+}

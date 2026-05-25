@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Settings } from '../types';
 import { DEFAULT_SETTINGS, UI_TEXT } from '../constants';
+import { normalizeApiEndpoint } from '../services/endpoint';
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -60,6 +61,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   const textColor = isDark ? 'text-[#d4af37]' : 'text-[#2c2c2c]';
   const borderColor = '#b8860b';
   const inputBg = isDark ? 'bg-black/50' : 'bg-white/50';
+  const requestUrl = normalizeApiEndpoint(localSettings.apiEndpoint);
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
@@ -170,16 +172,30 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
           </div>
 
           <div className="space-y-2">
-            <label className="block text-[#8b7d6b] uppercase text-xs tracking-widest">{t.modelIdLabel}</label>
+            <label className="block text-[#8b7d6b] uppercase text-xs tracking-widest">
+              {t.modelIdLabel}
+            </label>
             <input
               type="text"
               name="modelId"
               value={localSettings.modelId}
               onChange={handleChange}
-              placeholder="e.g. ep-2025... (Volcengine Endpoint ID)"
+              placeholder="e.g. ep-2025..."
               className={`w-full border p-3 focus:outline-none transition-all ${inputBg}`}
               style={{ borderColor: `${borderColor}30`, color: isDark ? '#d4af37' : '#2c2c2c' }}
             />
+          </div>
+
+          <div className="space-y-2">
+            <label className="block text-[#8b7d6b] uppercase text-xs tracking-widest">
+              {t.requestPathLabel}
+            </label>
+            <div
+              className={`w-full border p-3 break-all text-xs leading-relaxed ${inputBg}`}
+              style={{ borderColor: `${borderColor}20`, color: isDark ? '#8b7d6b' : '#5f5448' }}
+            >
+              POST {requestUrl}
+            </div>
           </div>
 
           <div className="space-y-2">
